@@ -9,6 +9,7 @@
 #define BORDER 2
 #define CONSOLE_W 80
 #define CONSOLE_H 25
+#define MENU_W 24
 
 // Codes ascii des caractères d'affichage
 #define A_BORDER 219
@@ -47,7 +48,6 @@
 // Valeurs maximales
 #define MAX_X 20
 #define MAX_Y 50
-#define NB_BOMBS 25
 
 /*
 
@@ -58,16 +58,23 @@ Ici la case 0,0 est en haut à gauche
 */
 
 // Variables globales
-int game[MAX_Y][MAX_X], nbCases = 1000, gameY = 10, gameX = 10; // Carte où seront stocké nos informations
+int game[MAX_Y][MAX_X], nbCases = 100, gameY = 10, gameX = 10; // Carte où seront stocké nos informations
+int flags[MAX_Y][MAX_X]; // Carte où seront stocké les drapeaux
+int offsetX = BORDER, offsetY = BORDER; // Ecart en x et y du jeu par rapport au bord, calculé dans showBorder();
 int nbBombs = 5; // Nombre de bombes
 int nbMined = 0; // Nombre de cases mines
-int gameOver = FALSE;
+int nbFlags = 0; // Nombre de drapeaux posés
+int gameOver = FALSE; // Permet de notifer à la boucle principale la fin du jeu
+int needToClear = FALSE;	// Permet de demander à effacer la zone de message
 
 // Headers des fonctions
 void generateGame();
 void generateBombs();
+void showBorders();
+void showMenu();
 void showGame();
 void gotoCase();
+void gotoMenu();
 void mineCase();
 void newGame();
 void endGame();
@@ -78,27 +85,112 @@ main()
     char touche;	// Variable où sera stocké la touche
     int cursorX = 0, cursorY = 0; // Position du curseur
 	time_t depart, arrivee; // Variables de temps
+	double bestScore = -1, score = -1, lastScore = -1; // scores
 
 	// On choisit le titre
 	system("TITLE Minesweeper");
 
-	// On force la taille de la fenetre
-	system("mode con LINES=25 COLS=80");
+	// On force la taille de la fenetre (on ajoute 1 à CONSOLE_W et CONSOLE_H)
+	//system("mode con LINES=26 COLS=81");
 
 	// Activation de rand()
 	srand(time(NULL));
 
+	// Génération de la bordure
+	showBorders();
+
+	// Affichage du menu
+	showMenu();
+
 	// Nouvelle partie
 	newGame();
 
-	// Gestion des touches
+	// On démarre le chrono
+    time(&depart);
+
+	// Gestion des touches (boucle principale du programme)
 	do{
+		// Définition de la couleur du texte
+		textbackground(B_TEXT);
+		textcolor(C_TEXT);
 
-		// On remet le curseur là où le joueur joue
-		gotoCase(cursorX, cursorY);
+		// On affiche le nombre de bombes restantes
+		gotoMenu(6);
+		printf("Bombs : %d   ", nbBombs-nbFlags);
 
-		//On récupère la touche appuyer
-		touche = getch();
+		// On affiche le meilleur score
+		if(lastScore != -1)
+		{
+			gotoMenu(8);
+			printf("Last Score : %.0f    ", lastScore);
+		}
+
+		// On affiche le meilleur score
+		if(bestScore != -1)
+		{
+			gotoMenu(9);
+			printf("Best Score : %.0f    ", bestScore);
+		}
+
+		// Si le joueur perd
+		if(gameOver == TRUE)
+		{
+			// Affichage des bombes
+			showBombs();
+
+			// On affiche le message
+			msgZone(C_ERROR, B_ERROR);
+			printf("BOOOOOM !");
+			gotoxy(CONSOLE_W-BORDER-MENU_W+1, CONSOLE_H-BORDER-2);
+			printf("Retry ? Press \"r\"");
+
+			// Pour l'esthétique, on remet le curseur à sa place
+			gotoCase(cursorX, cursorY);
+
+			// On attend que la touche "r" ou "q" soit appuyer
+			do{
+				touche = getch();
+			}while(touche != 114 && touche != 113);
+		}
+		else if(nbMined == nbCases-nbBombs) // Si le joueur gagne
+		{
+			// On calcul le temps mis pour gagner
+			time(&arrivee);
+			score = difftime(arrivee, depart);
+
+			// On met à jour le meilleur score
+			if(score < bestScore || bestScore == -1) bestScore = score;
+			lastScore = score;
+
+			// On affiche qu'il a gagner
+			msgZone(C_SUCESS, B_SUCESS);
+			printf("YOU WIN !");
+			gotoxy(CONSOLE_W-BORDER-MENU_W+1, CONSOLE_H-BORDER-2);
+			printf("Score : %.0f", score);
+
+			// Pour l'esthétique, on remet le curseur à sa place
+			gotoCase(cursorX, cursorY);
+
+			// On attend que la touche "r" ou "q" soit appuyer
+			do{
+				touche = getch();
+			}while(touche != 114 && touche != 113);
+		}
+		else
+		{
+			// On remet le curseur là où le joueur était
+			gotoCase(cursorX, cursorY);
+
+			//On récupère la touche appuyer
+			touche = getch();
+		}
+
+		// Lorsque quelqu'une fonction demande à ce que le message soit effacer
+		if(needToClear == TRUE)
+		{
+			// On efface le message précédent
+			clearMsg();
+		}
 
 		// Si c'est un mouvement, on se déplace
 		if(touche == -32)
@@ -122,12 +214,14 @@ main()
 		}
 		else if(touche == 102) // S'il pose un drapeau (touche "f")
 		{
-			//putFlag(x, y);
+			putFlag(cursorX, cursorY);
 		}
 		else if(touche == 114) // Touche pour commencer une nouvelle partie (touche "r")
 		{
 			newGame();
-			gotoCase(0, 0);
+			cursorX = 0;
+			cursorY = 0;
+			gotoCase(cursorX, cursorY);
 
 			// On remet à zéro le chrono
 			time(&depart);
@@ -145,7 +239,7 @@ main()
 
 }
 
-// Génère un tableau entièrement à 0
+// Génère un tableau entièrement de 0
 void generateGame()
 {
 	int x, y; // Variables utiles
@@ -180,10 +274,96 @@ void generateBombs()
 }
 
 // Affiche le jeu
+void showBorders()
+{
+	int x, y; // Variable utiles
+
+	offsetX = ((CONSOLE_W-(BORDER*3)-MENU_W-gameX)/2)+BORDER;
+	offsetY = ((CONSOLE_H-(BORDER*2)-gameY)/2)+BORDER;
+
+	// On choisit nos couleurs
+	textbackground(B_BORDER);
+	textcolor(C_BORDER);
+
+	// On parcourt la fenetre du haut vers le bas
+	for(y = 0; y < CONSOLE_H; y++)
+	{
+		// On se positionne à la première case de la ligne
+		gotoxy(0, y);
+
+		// On rempli d'une bordure entière les premières et dernières lignes
+		if(y < BORDER || y >= CONSOLE_H-BORDER)
+		{
+			for(x = 0; x <= CONSOLE_W; x++)
+			{
+				printf("%c", A_BORDER);
+			}
+		}
+		else
+		{
+			if(y < offsetY || y >= offsetY+gameY)
+			{
+				for(x = 0; x < CONSOLE_W-BORDER-MENU_W; x++)
+				{
+					printf("%c", A_BORDER);
+				}
+			}
+			else //Espace où se trouve le jeu
+			{
+				// Bordure de gauche
+				for(x = 0; x < offsetX; x++)
+				{
+					printf("%c", A_BORDER);
+				}
+
+				// Bordure du milieu
+				gotoxy(gameX+offsetX, y);
+				for(x = 0; x < CONSOLE_W-BORDER-MENU_W-gameX-offsetX; x++)
+				{
+					printf("%c", A_BORDER);
+				}
+			}
+
+			// Bordure de droite
+			gotoxy(CONSOLE_W-BORDER, y);
+			for(x = 0; x < BORDER; x++)
+			{
+				printf("%c", A_BORDER);
+			}
+		}
+	}
+
+	// Pour corriger un problème d'esthétique (essayer sans pour comprendre)
+	gotoxy(0, 0);
+}
+
+// Génération du menu
+void showMenu()
+{
+	// Définition de la couleur du texte
+	textbackground(B_TEXT);
+	textcolor(C_TEXT);
+
+	// On écris les touches
+	gotoMenu(1);
+	printf("Select\t: SPACE");
+	gotoMenu(2);
+	printf("Flag\t: f");
+	gotoMenu(3);
+	printf("Restart\t: r");
+	gotoMenu(4);
+	printf("Quit\t: q");
+}
+
+// Affiche le jeu
 void showGame()
 {
 	int x, y; // Variable de recherche
 
+	// On choisit les couleurs
+	textbackground(B_MAP);
+	textcolor(C_MAP);
+	/*
 	for(x = 0; x < gameX; x++)
 	{
 		for(y = 0; y < gameY; y++)
@@ -192,8 +372,17 @@ void showGame()
 			gotoCase(x, y);
 
 			// On affiche
-			textbackground(B_MAP);
-			textcolor(C_MAP);
+			printf("%c", A_MAP);
+		}
+	}
+	*/
+	for(y = 0; y < gameY; y++)
+	{
+		// On se place sur la case
+		gotoCase(0, y);
+		for(x = 0; x < gameX; x++)
+		{
+			// On affiche
 			printf("%c", A_MAP);
 		}
 	}
@@ -225,7 +414,13 @@ void showBombs()
 // Prend en paramètre les coordonnées de "game" et les convertis en coordonnées réels sur la console
 void gotoCase(int x, int y)
 {
-	gotoxy(x, y);
+	gotoxy(x+offsetX, y+offsetY);
+}
+
+// Permet de se déplacer sur une ligne du menu pour écrire
+void gotoMenu(int ligne)
+{
+	gotoxy(CONSOLE_W-BORDER-MENU_W+2, BORDER+ligne);
 }
 
 // Fonction executé lorsque l'utilisateur choisit une case
@@ -235,7 +430,7 @@ void mineCase(int x, int y)
 	int i, j; // Variable de recherche
 
 	// On vérifie que c'est pas la deuxième fois que l'utilisateur appuie ici
-	if(game[x][y] != GAME_NULL)
+	if(game[x][y] == GAME_NULL)
 	{
 		nbMined++;
 	}
@@ -277,8 +472,8 @@ void mineCase(int x, int y)
 		}
 
 		// On vérifie que le joueur n'avait pas posé un drapeau ici
-		//if(game[x][y] == GAME_FLAG)
-		//	removeFlag(x, y); // On l'enlève si c'était le cas
+		if(flags[x][y] == GAME_FLAG)
+			removeFlag(x, y); // On l'enlève si c'était le cas
 
 		// On indique que l'on a miné ici
 		game[x][y] = countBomb;
@@ -333,6 +528,70 @@ void mineCase(int x, int y)
 	}
 }
 
+// Permet de poser un drapeau
+void putFlag(int x, int y)
+{
+	// On execute le contenu seulement si la case n'a pas été minée
+	if(game[x][y] == GAME_NULL || game[x][y] == GAME_BOMB)
+	{
+		// On vérifie qu'il n'y a pas déjà un drapeau
+		if(flags[x][y] != GAME_FLAG)
+		{
+			// On vérifie que l'on a pas mis plus de drapeau que de bombes
+			if(nbFlags < nbBombs)
+			{
+				// On choisit nos couleurs
+				textbackground(B_FLAG);
+				textcolor(C_FLAG);
+
+				// On affiche le drapeau
+				printf("%c", A_FLAG);
+
+				// On ajoute le drapeau à la liste
+				addFlag(x, y);
+			}
+			else
+			{
+				// On affiche une erreur
+				msgZone(C_WARNING, B_WARNING);
+				printf("You can't use more");
+				gotoxy(CONSOLE_W-BORDER-MENU_W+1, CONSOLE_H-BORDER-2);
+				printf("than %d flags", nbBombs);
+			}
+		}
+		else // Sinon on enlève le drapeau existant
+		{
+			// On choisit nos couleurs
+			textbackground(B_MAP);
+			textcolor(C_MAP);
+
+			// On remet un case non miné
+			printf("%c", A_MAP);
+
+			// On enleve le drapeau du tableau
+			removeFlag(x, y);
+		}
+	}
+}
+
+
+// Ajoute un drapeau dans le tableau
+void addFlag(int x, int y)
+{
+	flags[x][y] == GAME_FLAG;
+	nbFlags++;
+}
+
+// Enlève un drapeau du tableau
+void removeFlag(int x, int y)
+{
+	// Enlève le drapeau
+	flags[x][y] == GAME_NULL;
+
+	// On réduit le nombre de flags
+	nbFlags--;
+}
+
 // Nouveau Jeu
 void newGame()
 {
@@ -348,6 +607,7 @@ void newGame()
 	// On réinitialise les variables
 	gameOver = FALSE;
 	nbMined = 0;
+	nbFlags = 0;
 }
 
 // Fin du jeu
@@ -358,4 +618,40 @@ void endGame()
 
 	// On indique que le jeu est fini
 	gameOver = TRUE;
+}
+
+// Permet de créer une zone coloré pour écrire un message
+void msgZone(int color, int background)
+{
+	// Variables utiles
+	int x, y;
+
+	// Les couleurs
+	textbackground(background);
+	textcolor(color);
+
+	for(y = CONSOLE_H-BORDER-4; y < CONSOLE_H-BORDER; y++)
+	{
+		// On se positionne
+		gotoxy(CONSOLE_W-BORDER-MENU_W, y);
+
+		for(x = 0; x < MENU_W; x++)
+		{
+			printf("%c", 32); // Ajoute des espaces
+		}
+	}
+
+	//On position le curseur pour le message
+	gotoxy(CONSOLE_W-BORDER-MENU_W+1, CONSOLE_H-BORDER-3);
+
+	needToClear = TRUE;
+}
+
+// Effacer la zone de message
+void clearMsg()
+{
+	// On efface
+	msgZone(B_TEXT, B_TEXT);
+	// On indique que s'est effacer
+	needToClear = FALSE;
 }
