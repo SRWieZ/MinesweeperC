@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include "myconio.h"
 
+// permet de simuler un booelen
 #define TRUE 1
 #define FALSE 0
 
@@ -46,8 +47,8 @@
 #define GAME_FLAG 10
 
 // Valeurs maximales
-#define MAX_X 20
-#define MAX_Y 50
+#define MAX_X 50
+#define MAX_Y 20
 
 /*
 
@@ -55,12 +56,17 @@ Démineur par DENIZ Eser
 
 Ce jeu contient une version modifier de myconio pour enlever les x - 1 et y - 1 de goto(x,y)
 Ici la case 0,0 est en haut à gauche
+
+Les valeurs maximales ne sont là que pour un prochain menu permettant de decider de la taille du jeu
+en changeant les valeurs de gameX, gameY, nbBombs et nbCases = gameX*gameY.
+Il suffit plus qu'à apeller la fonction showBorders() puis newGame()
+Essayez avec les touches 1, 2 et 3
 */
 
 // Variables globales
-int game[MAX_Y][MAX_X], nbCases = 100, gameY = 10, gameX = 10; // Carte où seront stocké nos informations
-int flags[MAX_Y][MAX_X]; // Carte où seront stocké les drapeaux
-int offsetX = BORDER, offsetY = BORDER; // Ecart en x et y du jeu par rapport au bord, calculé dans showBorder();
+int game[MAX_X][MAX_Y], nbCases = 100, gameX = 10, gameY = 10; // Carte où seront stocké nos informations
+int flags[MAX_X][MAX_Y]; // Carte où seront stocké les drapeaux
+int offsetX = BORDER, offsetY = BORDER; // Ecart en x et y du jeu par rapport au bord, calculé ensuite dans showBorder();
 int nbBombs = 5; // Nombre de bombes
 int nbMined = 0; // Nombre de cases mines
 int nbFlags = 0; // Nombre de drapeaux posés
@@ -83,7 +89,7 @@ void endGame();
 main()
 {
     char touche;	// Variable où sera stocké la touche
-    int cursorX = 0, cursorY = 0; // Position du curseur
+    int cursorX = 0, cursorY = 0; // Position du curseur du joueur
 	time_t depart, arrivee; // Variables de temps
 	double bestScore = -1, score = -1, lastScore = -1; // scores
 
@@ -152,7 +158,7 @@ main()
 				touche = getch();
 			}while(touche != 114 && touche != 113);
 		}
-		else if(nbMined == nbCases-nbBombs) // Si le joueur gagne
+		else if(nbMined == nbCases-nbBombs) // Si le joueur gagne (le nombre de cases minées est égal au nombre total de cases moins les bombes)
 		{
 			// On calcul le temps mis pour gagner
 			time(&arrivee);
@@ -192,7 +198,7 @@ main()
 			clearMsg();
 		}
 
-		// Si c'est un mouvement, on se déplace
+		// Si c'est un mouvement
 		if(touche == -32)
 		{
 			// On récupère le sens
@@ -210,15 +216,18 @@ main()
 		}
 		else if(touche == 32) // S'il selectionne la case (espace)
 		{
-			mineCase(cursorX, cursorY);
+			mineCase(cursorX, cursorY); // On execute la fonction de minage
 		}
 		else if(touche == 102) // S'il pose un drapeau (touche "f")
 		{
-			putFlag(cursorX, cursorY);
+			putFlag(cursorX, cursorY); // On execute la fonction pour poser/enlever un drapeau
 		}
 		else if(touche == 114) // Touche pour commencer une nouvelle partie (touche "r")
 		{
+			// Nouvelle partie
 			newGame();
+
+			// On remet le curseur en haut à gauche
 			cursorX = 0;
 			cursorY = 0;
 			gotoCase(cursorX, cursorY);
@@ -228,15 +237,53 @@ main()
 		}
 		else if(touche == 98) // Touche de debug pour voir les bombes (touche B)
 		{
+			// Touche de debug/triche pour afficher les bombes
 			showBombs();
 		}
-		else if(touche == 113) // Touche de debug pour voir les bombes (touche q)
+		else if(touche == '1') // Touche pour aller au niveau 1 (oui c'est une fonction caché à l'utilisateur mais c'est pas terminé même si ça fonctionne)
 		{
-			return TRUE;
+			gameX=10;
+			gameY=10;
+			nbBombs=5;
+			nbCases=gameX*gameY;
+			showBorders();
+			newGame();
+			cursorX = 0;
+			cursorY = 0;
+			gotoCase(cursorX, cursorY);
+			time(&depart);
+		}
+		else if(touche == '2') // Touche pour aller au niveau 2
+		{
+			gameX=30;
+			gameY=15;
+			nbBombs=20;
+			nbCases=gameX*gameY;
+			showBorders();
+			newGame();
+			cursorX = 0;
+			cursorY = 0;
+			gotoCase(cursorX, cursorY);
+			time(&depart);
+		}
+		else if(touche == '3') // Touche pour aller au niveau 2
+		{
+			gameX=50;
+			gameY=20;
+			nbBombs=55;
+			nbCases=gameX*gameY;
+			showBorders();
+			newGame();
+			cursorX = 0;
+			cursorY = 0;
+			gotoCase(cursorX, cursorY);
+			time(&depart);
 		}
 	}
-	while(touche != '0');
+	while(touche != 113); // Touche pour quitter le jeu
 
+	// On termine la fonction main donc le programme
+	return TRUE;
 }
 
 // Génère un tableau entièrement de 0
