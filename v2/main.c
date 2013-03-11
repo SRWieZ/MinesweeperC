@@ -81,9 +81,14 @@ void showMenu();
 void showGame();
 void gotoCase();
 void gotoMenu();
-void mineCase();
+void mineCase(int x, int y);
+void putFlag(int x, int y);
+void addFlag(int x, int y);
+void removeFlag(int x, int y);
 void newGame();
 void endGame();
+void msgZone(int color, int background);
+void clearMsg();
 
 // Fonction main
 main()
@@ -538,9 +543,9 @@ void mineCase(int x, int y)
 				case 2:textcolor(LIGHTGREEN);break;
 				case 3:textcolor(LIGHTRED);break;
 				case 4:textcolor(BLUE);break;
-				case 5:textcolor(RED);break;
-				case 6:textcolor(RED);break;
-				case 7:textcolor(RED);break;
+				case 5:
+				case 6:
+				case 7:
 				case 8:textcolor(RED);break;
 			}
 
@@ -625,7 +630,7 @@ void putFlag(int x, int y)
 // Ajoute un drapeau dans le tableau
 void addFlag(int x, int y)
 {
-	flags[x][y] == GAME_FLAG;
+	flags[x][y] = GAME_FLAG;
 	nbFlags++;
 }
 
@@ -633,7 +638,7 @@ void addFlag(int x, int y)
 void removeFlag(int x, int y)
 {
 	// Enlève le drapeau
-	flags[x][y] == GAME_NULL;
+	flags[x][y] = GAME_NULL;
 
 	// On réduit le nombre de flags
 	nbFlags--;
